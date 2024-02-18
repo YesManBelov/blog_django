@@ -2,8 +2,9 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.mail import send_mail
 from django.shortcuts import render, get_object_or_404
 from django.views.generic import ListView
-from .models import Post
-from .forms import EmailPostForm
+from .models import Post, Comment
+from .forms import EmailPostForm, CommentForm
+from django.views.decorators.http import require_POST
 
 
 class PostListView(ListView):
@@ -47,9 +48,15 @@ def post_detail(request, year, month, day, post):
                              publish__month=month,
                              publish__day=day,
                              status=Post.Status.PUBLISHED)
+    # Список активных комментариев е этому посту
+    comments = post.comments.filter(active=True)
+    # форма для комментирования пользователями
+    form = CommentForm()
     return render(request,
                   'blog/post/detail.html',
-                  {'post': post})
+                  {'post': post,
+                        'comments': comments,
+                        'form': form})
 
 
 def post_share(request, post_id):
@@ -66,11 +73,10 @@ def post_share(request, post_id):
         if form.is_valid():
             # Поля успешно прошли валидацию
             cd = form.cleaned_data
-            print(cd['to'])
             post_url = request.build_absolute_uri(post.get_absolute_url())
-            subject = f"{cd['name']} тебе рекомендует почитать"\
+            subject = f"{cd['name']} тебе рекомендует почитать" \
                       f"{post.title}"
-            message = f"Читать {post.title} по адресу: {post_url}\n\n"\
+            message = f"Читать {post.title} по адресу: {post_url}\n\n" \
                       f"{cd['name']} комментирует: {cd['comments']}"
             send_mail(subject, message, 'nikolai@ozereshno.online',
                       [cd['to']])
@@ -81,3 +87,23 @@ def post_share(request, post_id):
     return render(request, 'blog/post/share.html', {'post': post,
                                                     'form': form,
                                                     'sent': sent})
+
+
+@require_POST
+def post_comment(request, post_id):
+    post = get_object_or_404(Post, id=post_id,
+                             status=Post.Status.PUBLISHED)
+    comment = None
+    # Комментарий был отправлен
+    form = CommentForm(data=request.POST)
+    if form.is_valid():
+        # создать объект класса, но не сохранять его в базу
+        comment = form.save(commit=False)
+        # назначить пост комментария
+        comment.post = post
+        # теперь сохранить
+        comment.save()
+    return render(request, 'blog/post/comment.html',
+                  {'post': post,
+                   'form': form,
+                   'comment': comment})
