@@ -1,3 +1,4 @@
+from django.contrib.postgres.search import TrigramSimilarity, SearchVector, SearchQuery, SearchRank
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.mail import send_mail
 from django.views.decorators.http import require_POST
@@ -8,7 +9,7 @@ from django.db.models import Count
 from taggit.models import Tag
 
 from .models import Post, Comment
-from .forms import EmailPostForm, CommentForm
+from .forms import EmailPostForm, CommentForm, SearchForm
 
 
 class PostListView(ListView):
@@ -129,3 +130,36 @@ def post_comment(request, post_id):
                   {'post': post,
                    'form': form,
                    'comment': comment})
+
+
+def post_search(request):
+    form = SearchForm()
+    query = None
+    results = []
+
+    if 'query' in request.GET:
+        form = SearchForm(request.GET)
+        if form.is_valid():
+            query = form.cleaned_data['query']
+
+            # поиск по веса, рангу конфигу стоп слов
+            # search_vector = SearchVector('title', weight='A', config='russian') + \
+            #     SearchVector('body', weight='B', config='russian')
+            # search_query = SearchQuery(query, config='russian')
+            # results = Post.published.annotate(
+            #     search=search_vector,
+            #     rank=SearchRank(search_vector, search_query)
+            # ).filter(rank__gte=0.3).order_by('-rank')
+
+            # Поиск по триграмному сходству
+            # он может искать опечатки
+            # для базы данных нужно установить расширение CREATE EXTENSION pg_trgm;
+            results = Post.published.annotate(
+                similarity=TrigramSimilarity('title', query),
+            ).filter(similarity__gt=0.1).order_by('-similarity')
+
+    return render(request,
+                  'blog/post/search.html',
+                  {'form': form,
+                   'query': query,
+                   'results': results})
