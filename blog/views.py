@@ -164,3 +164,19 @@ def post_search(request):
                   {'form': form,
                    'query': query,
                    'results': results})
+
+git filter-branch --env-filter '
+OLD_EMAIL="afoton777@gmail.com"
+CORRECT_NAME="Nikolaus"
+CORRECT_EMAIL="nikolai@nmeev.ru"
+if [ "$GIT_COMMITTER_EMAIL" = "$OLD_EMAIL" ]
+then
+    export GIT_COMMITTER_NAME="$CORRECT_NAME"
+    export GIT_COMMITTER_EMAIL="$CORRECT_EMAIL"
+fi
+if [ "$GIT_AUTHOR_EMAIL" = "$OLD_EMAIL" ]
+then
+    export GIT_AUTHOR_NAME="$CORRECT_NAME"
+    export GIT_AUTHOR_EMAIL="$CORRECT_EMAIL"
+fi
+' --tag-name-filter cat -- --branches --tags
