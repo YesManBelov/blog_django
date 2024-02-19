@@ -1,10 +1,14 @@
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.mail import send_mail
-from django.shortcuts import render, get_object_or_404
+from django.views.decorators.http import require_POST
 from django.views.generic import ListView
+from django.shortcuts import render, get_object_or_404
+from django.db.models import Count
+
+from taggit.models import Tag
+
 from .models import Post, Comment
 from .forms import EmailPostForm, CommentForm
-from django.views.decorators.http import require_POST
 
 
 class PostListView(ListView):
@@ -17,11 +21,16 @@ class PostListView(ListView):
     template_name = 'blog/post/list.html'
 
 
-def post_list(request):
+def post_list(request, tag_slug=None):
     """
     Представления списка постов на основе функции
     """
     posts_list = Post.published.all()
+    tag = None
+    if tag_slug:
+        tag = get_object_or_404(Tag, slug=tag_slug)
+        posts_list = posts_list.filter(tags__in=[tag])  # поиск по конкретному тэгу
+
     # Постраничная разбивка
     paginator = Paginator(posts_list, 3)
     page_number = request.GET.get('page', 1)
@@ -38,7 +47,8 @@ def post_list(request):
         posts = paginator.page(1)
     return render(request,
                   'blog/post/list.html',
-                  {'posts': posts})
+                  {'posts': posts,
+                   'tag': tag})
 
 
 def post_detail(request, year, month, day, post):
@@ -55,8 +65,8 @@ def post_detail(request, year, month, day, post):
     return render(request,
                   'blog/post/detail.html',
                   {'post': post,
-                        'comments': comments,
-                        'form': form})
+                   'comments': comments,
+                   'form': form})
 
 
 def post_share(request, post_id):
