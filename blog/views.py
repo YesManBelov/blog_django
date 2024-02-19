@@ -126,6 +126,7 @@ def post_comment(request, post_id):
         comment.post = post
         # теперь сохранить
         comment.save()
+
     return render(request, 'blog/post/comment.html',
                   {'post': post,
                    'form': form,
